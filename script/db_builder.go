@@ -28,8 +28,8 @@ const enzymeRecordTemplate = `"{{.Enzyme.Name}}":{` +
 	`Site:"{{.Enzyme.Site}}",` +
 	`Length:{{.Enzyme.Length}},` +
 	`Substrate:"{{.Enzyme.Substrate}}",` +
-	`RegexpFor:regexp.MustCompile("{{.Enzyme.Site}}"),` +
-	`RegexpRev:regexp.MustCompile("{{.Enzyme.Site}}"),` +
+	`RegexpFor:regexp.MustCompile("{{.Enzyme.RegexpFor}}"),` +
+	`RegexpRev:regexp.MustCompile("{{.Enzyme.RegexpRev}}"),` +
 	`OverhangLength:{{.Enzyme.OverhangLength}},` +
 	`OverhangSequence:"{{.Enzyme.OverhangSequence}}",` +
 	`NumberOfCuts:{{.Enzyme.NumberOfCuts}},` +
