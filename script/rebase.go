@@ -276,7 +276,7 @@ func processBairochFile(bairochFp io.Reader, enzymes *map[string]enzyme.Enzyme) 
 		enzymeId := record["ID"][0]
 
 		if _, ok := (*enzymes)[enzymeId]; !ok {
-			fmt.Sprint("enzyme present in bairoch file, but not in enzyme definitions: '%s'", enzymeId)
+			fmt.Sprintf("enzyme present in bairoch file, but not in enzyme definitions: '%s'", enzymeId)
 
 			// For some reason there is at least one enzyme present in the bairoch file
 			// but not in the enzyme definitions. Ignoring and going on with the rest for now.
