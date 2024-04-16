@@ -1,4 +1,10 @@
-/* THIS FILE IS AUTO-GENERATED. DO NOT MODIFY THIS FILE MANUALLY */
+/*
+Package db contains a map of Restriction Enzymes pulled from the REBASE database.
+
+THIS FILE IS AUTO-GENERATED. DO NOT MODIFY THIS FILE MANUALLY.
+
+To update the database, run the script in the script directory.
+*/
 package db
 
 import (
