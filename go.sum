@@ -1,0 +1,4 @@
+github.com/bebop/poly v0.31.1 h1:QFfH9WVnQdbjPuEuKpLTYD3SQlYqTRJpoodTwt9xMfw=
+github.com/bebop/poly v0.31.1/go.mod h1:D4cg/mQSSP1MuvoDOET/QzEC9lV+dc5358kUUDRulM8=
+github.com/secsy/goftp v0.0.0-20200609142545-aa2de14babf4 h1:PT+ElG/UUFMfqy5HrxJxNzj3QBOf7dZwupeVC+mG1Lo=
+github.com/secsy/goftp v0.0.0-20200609142545-aa2de14babf4/go.mod h1:MnkX001NG75g3p8bhFycnyIjeQoOjGL6CEIsdE/nKSY=
