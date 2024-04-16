@@ -35,83 +35,32 @@ import (
 )
 
 /*
-func NewEnzymeFromStrings(name string, pattern string, length string, ncuts string, bluntVal string, cutPositions []string) (enzyme.Enzyme, error) {
 
-	lengthInt, err := strconv.Atoi(length)
-	if err != nil {
-		return enzyme.Enzyme{}, err
-	}
-
-	ncuts
-
-
-
-	var blunt bool = false
-	if bluntVal == "0" {
-		blunt = false
-	} else if bluntVal == "1" {
-		blunt = true
-	} else {
-		return enzyme.Enzyme{}, fmt.Errorf("invalid blunt value: %s", blunt)
-	}
-
-	intCutPositions := make([]int, len(cutPositions))
-	for i, cutPos := range cutPositions {
-		intCutPos, err := strconv.Atoi(cutPos)
-		if err != nil {
-			return enzyme.Enzyme{}, err
-		}
-		intCutPositions[i] = intCutPos
-	}
-
-	/*
-
-		The REBASE file format header describes the columns as follows:
-				# Where:
-			# name = name of enzyme
-			# pattern = recognition site
-			# len = length of pattern
-			# ncuts = number of cuts made by enzyme
-			#         Zero represents unknown
-			# blunt = true if blunt end cut, false if sticky
-			# c1 = First 5' cut
-			# c2 = First 3' cut
-			# c3 = Second 5' cut
-			# c4 = Second 3' cut
-			#
-			# Examples:
-			# AAC^TGG -> 6 2 1 3 3 0 0
-			# A^ACTGG -> 6 2 0 1 5 0 0
-			# AACTGG  -> 6 0 0 0 0 0 0
-			# AACTGG(-5/-1) -> 6 2 0 1 5 0 0
-			# (8/13)GACNNNNNNTCA(12/7) -> 12 4 0 -9 -14 24 19
-			#
-			# i.e. cuts are always to the right of the given
-			# residue and sequences are always with reference to
-			# the 5' strand.
-			# Sequences are numbered ... -3 -2 -1 1 2 3 ... with
-			# the first residue of the pattern at base number 1.
-	*
-
-	return enzyme.Enzyme{
-		Name:      name,
-		RegexpFor: regexp.MustCompile(pattern),
-		RegexpRev: regexp.MustCompile(transform.ReverseComplement(pattern)),
-		Site:      pattern,
-
-		Size: lengthInt,
-
-		//NCuts:  nCutsInt,
-		//Blunt:  blunt,
-
-		FivePrimeCutSite:  intCutPositions[0],
-		ThreePrimeCutSite: intCutPositions[1] - lengthInt,
-
-		// Confused about second cut site so omit for now
-		//FivePrimeCutSite2:  intCutPositions[2],
-		//ThreePrimeCutSite2: intCutPositions[3],
-	}, nil
-}
+	The REBASE file format header describes the columns as follows:
+			# Where:
+		# name = name of enzyme
+		# pattern = recognition site
+		# len = length of pattern
+		# ncuts = number of cuts made by enzyme
+		#         Zero represents unknown
+		# blunt = true if blunt end cut, false if sticky
+		# c1 = First 5' cut
+		# c2 = First 3' cut
+		# c3 = Second 5' cut
+		# c4 = Second 3' cut
+		#
+		# Examples:
+		# AAC^TGG -> 6 2 1 3 3 0 0
+		# A^ACTGG -> 6 2 0 1 5 0 0
+		# AACTGG  -> 6 0 0 0 0 0 0
+		# AACTGG(-5/-1) -> 6 2 0 1 5 0 0
+		# (8/13)GACNNNNNNTCA(12/7) -> 12 4 0 -9 -14 24 19
+		#
+		# i.e. cuts are always to the right of the given
+		# residue and sequences are always with reference to
+		# the 5' strand.
+		# Sequences are numbered ... -3 -2 -1 1 2 3 ... with
+		# the first residue of the pattern at base number 1.
 */
 
 func convertToInts(intStrings ...string) ([]int, error) {
@@ -223,6 +172,26 @@ func processEnzymeFile(enzymeFp io.Reader, enzymes *map[string]enzyme.Enzyme) er
 	return nil
 }
 
+/* Process the bairoch.### file
+
+The file is composed of many records separated by "//". Each record is composed of
+
+	Record Example
+
+	ID   AaaI
+	ET   R2
+	AC   RB00001;
+	OS   Acetobacter aceti ss aceti
+	PT   XmaIII
+	RS   CGGCCG, 1;
+	CR   .
+	RN   [1]
+	RA   Tagami H., Tayama K., Tohyama T., Fukaya M., Okumura H., Kawamura Y.,
+	RA   Horinouchi S., Beppu T.;
+	RL   FEMS Microbiol. Lett. 56:161-166(1988).
+	//
+*/
+
 func getNextBairochRecord(scanner *bufio.Scanner) (map[string][]string, error) {
 	record := make(map[string][]string)
 
@@ -276,7 +245,7 @@ func processBairochFile(bairochFp io.Reader, enzymes *map[string]enzyme.Enzyme) 
 		enzymeId := record["ID"][0]
 
 		if _, ok := (*enzymes)[enzymeId]; !ok {
-			fmt.Sprintf("enzyme present in bairoch file, but not in enzyme definitions: '%s'", enzymeId)
+			fmt.Printf("enzyme present in bairoch file, but not in enzyme definitions: '%s'", enzymeId)
 
 			// For some reason there is at least one enzyme present in the bairoch file
 			// but not in the enzyme definitions. Ignoring and going on with the rest for now.
@@ -297,23 +266,6 @@ func processBairochFile(bairochFp io.Reader, enzymes *map[string]enzyme.Enzyme) 
 		}
 		enzyme.Uri = fmt.Sprintf("https://identifiers.org/rebase:%d", enzyme.RebaseId)
 		enzyme.References = record["RA"]
-
-		/*
-			Record Example
-
-			ID   AaaI
-			ET   R2
-			AC   RB00001;
-			OS   Acetobacter aceti ss aceti
-			PT   XmaIII
-			RS   CGGCCG, 1;
-			CR   .
-			RN   [1]
-			RA   Tagami H., Tayama K., Tohyama T., Fukaya M., Okumura H., Kawamura Y.,
-			RA   Horinouchi S., Beppu T.;
-			RL   FEMS Microbiol. Lett. 56:161-166(1988).
-			//
-		*/
 
 		// Put the modified enzyme back in map
 		(*enzymes)[enzymeId] = enzyme
