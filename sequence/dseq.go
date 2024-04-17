@@ -1,3 +1,6 @@
+/*
+Sequence package provides a Dseq struct that represents a double stranded DNA sequence.
+*/
 package sequence
 
 import (
@@ -60,6 +63,17 @@ type Cutter interface {
 	GetNextRecognitionSite(sequence string, offset int, isCircular bool) (int, *enzyme.Enzyme, constants.Strand)
 }
 
+/*
+Cut the Dseq with the provided enzyme.
+
+Takes either a single enzyme or a batch of enzymes (RestrictionBatch).
+
+Returns a slice of Dseqs that represent the fragments of the Dseq after cutting with the enzyme.
+
+If the enzyme is circular, the sequence is treated as circular and the
+function will return the next recognition site, even if it spans the
+beginning and end of the sequence.
+*/
 func (dSeq *Dseq) Cut(enzyme Cutter) []Dseq {
 	fragments := make([]Dseq, 0)
 
