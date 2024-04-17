@@ -14,6 +14,10 @@ func NewRestrictionBatch(enzymes ...Enzyme) RestrictionBatch {
 	}
 }
 
+func (restrictionBatch *RestrictionBatch) Add(enzyme Enzyme) {
+	restrictionBatch.Enzymes = append(restrictionBatch.Enzymes, enzyme)
+}
+
 /*
 Find the next recognition site in a sequence after the provided offset.
 that is cut by any of the enzymes in the batch.

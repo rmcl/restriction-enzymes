@@ -24,3 +24,22 @@ func TestGetNextRecognitionSiteForBatch(unittest *testing.T) {
 		unittest.Errorf("Expected 25, nil, BsaI, got %d, %v, %s", position, enzyme, strand)
 	}
 }
+
+func TestAddEnzymeToBatch(unittest *testing.T) {
+
+	batch := NewRestrictionBatch(
+		FIXTURES["BsaI"],
+		FIXTURES["EcoRI"],
+	)
+
+	if len(batch.Enzymes) != 2 {
+		unittest.Errorf("Expected 2 enzymes, got %d", len(batch.Enzymes))
+	}
+
+	batch.Add(FIXTURES["BamHI"])
+
+	if len(batch.Enzymes) != 3 {
+		unittest.Errorf("Expected 3 enzymes, got %d", len(batch.Enzymes))
+	}
+
+}
