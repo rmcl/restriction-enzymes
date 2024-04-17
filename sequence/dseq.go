@@ -4,21 +4,8 @@ import (
 	"fmt"
 
 	"github.com/bebop/poly/transform"
+	"github.com/rmcl/restriction-enzymes/constants"
 	"github.com/rmcl/restriction-enzymes/enzyme"
-)
-
-type Strand string
-
-const (
-	Watson Strand = "watson"
-	Crick  Strand = "crick"
-)
-
-type SequenceGeometry string
-
-const (
-	Linear   SequenceGeometry = "linear"
-	Circular SequenceGeometry = "circular"
 )
 
 type Dseq struct {
@@ -33,7 +20,7 @@ type Dseq struct {
 	Overhang int
 
 	// A string representing the geometry of the DNA sequence. Can be "linear" or "circular".
-	Geometry SequenceGeometry
+	Geometry constants.SequenceGeometry
 }
 
 func (dSeq *Dseq) Print() {
@@ -51,7 +38,7 @@ func (dSeq *Dseq) Print() {
 	fmt.Println(dSeq.Crick)
 }
 
-func NewFromWatsonStrand(watson string, geometry SequenceGeometry) *Dseq {
+func NewFromWatsonStrand(watson string, geometry constants.SequenceGeometry) *Dseq {
 	return &Dseq{
 		Watson:   watson,
 		Crick:    transform.Complement(watson),
@@ -60,7 +47,7 @@ func NewFromWatsonStrand(watson string, geometry SequenceGeometry) *Dseq {
 	}
 }
 
-func NewDseq(watson, crick string, overhang int, geometry SequenceGeometry) *Dseq {
+func NewDseq(watson, crick string, overhang int, geometry constants.SequenceGeometry) *Dseq {
 	return &Dseq{
 		Watson:   watson,
 		Crick:    crick,
@@ -69,110 +56,71 @@ func NewDseq(watson, crick string, overhang int, geometry SequenceGeometry) *Dse
 	}
 }
 
-func GetNextRecognitionSite(
-	sequence string,
-	offset int,
-	enzyme enzyme.Enzyme,
-	isCircular bool,
-) (int, Strand) {
-
-	sequence = sequence[offset:]
-
-	// If the enzyme is circular, we need to support the case where the
-	// recognition site spans the beginning and end of the sequence.
-	// To do this, we append the sequence to itself of length site - 1.
-	if isCircular {
-		sequence += sequence[:len(enzyme.Site)-1]
-	}
-
-	var watsonMatchIndex int
-	var crickMatchIndex int
-
-	watsonMatch := enzyme.RegexpFor.FindStringIndex(sequence)
-	if watsonMatch != nil {
-		watsonMatchIndex = watsonMatch[0] + offset
-	} else {
-		watsonMatchIndex = -1
-	}
-
-	crickMatch := enzyme.RegexpRev.FindStringIndex(sequence)
-	if crickMatch != nil {
-		crickMatchIndex = crickMatch[0] + offset
-	} else {
-		crickMatchIndex = -1
-	}
-
-	if watsonMatchIndex > -1 && crickMatchIndex > -1 {
-
-		if watsonMatchIndex < crickMatchIndex {
-			return watsonMatchIndex, Watson
-		} else {
-			return crickMatchIndex, Crick
-		}
-
-	} else if watsonMatchIndex > -1 {
-		return watsonMatchIndex, Watson
-	} else {
-		return crickMatchIndex, Crick
-	}
-
+type Cutter interface {
+	GetNextRecognitionSite(sequence string, offset int, isCircular bool) (int, *enzyme.Enzyme, constants.Strand)
 }
 
-func (dSeq *Dseq) Cut(enzyme enzyme.Enzyme) []Dseq {
+func (dSeq *Dseq) Cut(enzyme Cutter) []Dseq {
 	fragments := make([]Dseq, 0)
 
 	nextSearchStart := 0
-	lastSiteIndex := 0
 	lastOverhang := 0
 
+	lastCrickCutIndex := 0
+	lastWatsonCutIndex := 0
+
 	for {
-		siteIndex, strand := GetNextRecognitionSite(dSeq.Watson, nextSearchStart, enzyme, dSeq.Geometry == Circular)
+		siteIndex, enzyme, strand := enzyme.GetNextRecognitionSite(
+			dSeq.Watson,
+			nextSearchStart,
+			dSeq.Geometry == constants.Circular,
+		)
 		if siteIndex == -1 {
 			break
 		}
 
-		if strand == Watson {
-			watsonCutIndex := siteIndex + enzyme.FivePrimeCutSite
-			crickCutIndex := siteIndex + enzyme.ThreePrimeCutSite
+		var watsonCutIndex, crickCutIndex int
+
+		if strand == constants.Watson {
+			watsonCutIndex = siteIndex + enzyme.FivePrimeCutSite
+			crickCutIndex = siteIndex + enzyme.ThreePrimeCutSite
 
 			fragment := Dseq{
-				Watson:   dSeq.Watson[lastSiteIndex:watsonCutIndex],
-				Crick:    dSeq.Crick[lastSiteIndex:crickCutIndex],
+				Watson:   dSeq.Watson[lastWatsonCutIndex:watsonCutIndex],
+				Crick:    dSeq.Crick[lastCrickCutIndex:crickCutIndex],
 				Overhang: lastOverhang,
 				Geometry: dSeq.Geometry,
 			}
 			fragments = append(fragments, fragment)
 
 			lastOverhang = (crickCutIndex - watsonCutIndex) * -1
-			lastSiteIndex = watsonCutIndex
-			nextSearchStart = lastSiteIndex
-			fmt.Println("Watson", lastOverhang)
+			nextSearchStart = watsonCutIndex
 
 		} else {
-			fmt.Println("Crick", lastOverhang, siteIndex, enzyme.Length, enzyme.FivePrimeCutSite, enzyme.ThreePrimeCutSite)
-
-			watsonCutIndex := siteIndex + enzyme.Length - enzyme.ThreePrimeCutSite
-			crickCutIndex := siteIndex + enzyme.Length - enzyme.FivePrimeCutSite
+			watsonCutIndex = siteIndex + enzyme.Length - enzyme.ThreePrimeCutSite
+			crickCutIndex = siteIndex + enzyme.Length - enzyme.FivePrimeCutSite
 			overhang := watsonCutIndex - crickCutIndex
 
 			fragment := Dseq{
-				Watson:   dSeq.Watson[lastSiteIndex:watsonCutIndex],
-				Crick:    dSeq.Crick[lastSiteIndex-overhang : crickCutIndex],
+				Watson:   dSeq.Watson[lastWatsonCutIndex:watsonCutIndex],
+				Crick:    dSeq.Crick[lastCrickCutIndex:crickCutIndex],
 				Overhang: overhang,
 				Geometry: dSeq.Geometry,
 			}
 			fragments = append(fragments, fragment)
 
 			nextSearchStart = siteIndex + 1
-			lastSiteIndex = watsonCutIndex
 
 		}
+
+		lastCrickCutIndex = crickCutIndex
+		lastWatsonCutIndex = watsonCutIndex
 	}
 
 	// Add the last fragment
 	fragment := Dseq{
-		Watson:   dSeq.Watson[lastSiteIndex:],
-		Crick:    dSeq.Crick[lastSiteIndex-lastOverhang:],
+		Watson:   dSeq.Watson[lastWatsonCutIndex:],
+		Crick:    dSeq.Crick[lastCrickCutIndex:],
 		Overhang: lastOverhang,
 		Geometry: dSeq.Geometry,
 	}

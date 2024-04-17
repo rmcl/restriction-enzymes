@@ -1,6 +1,10 @@
 package enzyme
 
-import "regexp"
+import (
+	"regexp"
+
+	"github.com/rmcl/restriction-enzymes/constants"
+)
 
 type EnzymeNumberOfCuts int
 
@@ -49,4 +53,61 @@ type Enzyme struct {
 	Suppliers []string
 
 	References []string
+}
+
+/*
+Find the next recognition site in a sequence after the provided offset.
+
+If the enzyme is circular, the sequence is treated as circular and the
+function will return the next recognition site, even if it spans the
+beginning and end of the sequence.
+*/
+func (enzyme *Enzyme) GetNextRecognitionSite(
+	sequence string,
+	offset int,
+	isCircular bool,
+) (int, *Enzyme, constants.Strand) {
+
+	sequence = sequence[offset:]
+
+	// If the enzyme is circular, we need to support the case where the
+	// recognition site spans the beginning and end of the sequence.
+	// To do this, we append the sequence to itself of length site - 1.
+	if isCircular {
+		sequence += sequence[:len(enzyme.Site)-1]
+	}
+
+	var watsonMatchIndex int
+	var crickMatchIndex int
+
+	watsonMatch := enzyme.RegexpFor.FindStringIndex(sequence)
+	if watsonMatch != nil {
+		watsonMatchIndex = watsonMatch[0] + offset
+	} else {
+		watsonMatchIndex = -1
+	}
+
+	crickMatch := enzyme.RegexpRev.FindStringIndex(sequence)
+	if crickMatch != nil {
+		crickMatchIndex = crickMatch[0] + offset
+	} else {
+		crickMatchIndex = -1
+	}
+
+	if watsonMatchIndex > -1 && crickMatchIndex > -1 {
+
+		if watsonMatchIndex <= crickMatchIndex {
+			return watsonMatchIndex, enzyme, constants.Watson
+		} else {
+			return crickMatchIndex, enzyme, constants.Crick
+		}
+
+	} else if watsonMatchIndex > -1 {
+		return watsonMatchIndex, enzyme, constants.Watson
+	} else if crickMatchIndex > -1 {
+		return crickMatchIndex, enzyme, constants.Crick
+	}
+
+	// No match found
+	return -1, nil, constants.Watson
 }
