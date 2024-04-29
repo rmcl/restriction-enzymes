@@ -1,5 +1,6 @@
 # Go Restriction Enzymes
 
+[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/koeng101/dnadesign/blob/main/LICENSE) 
 ![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/rmcl/666285a58b7279abb160786318ac6a3c/raw/restriction-enzymes-coverage.json)
 
 
