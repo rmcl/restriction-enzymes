@@ -25,7 +25,7 @@ jobs:
         with:
           auth: ${{ secrets.COVERAGE_GIST}}
           gistID: 666285a58b7279abb160786318ac6a3c
-          filename: coverage.json
+          filename: restriction-enzymes-coverage.json
           label: Coverage
           message: ${{ env.COVERAGE }}
           color: green
