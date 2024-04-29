@@ -1,6 +1,7 @@
 # Go Restriction Enzymes
 
-![badge](https://img.shields.io/endpoint?url=https://gist.github.com/rmcl/666285a58b7279abb160786318ac6a3c#file-restriction-enzymes-coverage-json)
+![badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/rmcl/666285a58b7279abb160786318ac6a3c/raw/03addf5c78b8a0b390a45bbdf103ab552640f550/restriction-enzymes-coverage.json)
+
 
 
 
