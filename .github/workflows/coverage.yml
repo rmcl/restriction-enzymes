@@ -23,7 +23,7 @@ jobs:
       - name: Create the Badge
         uses: schneegans/dynamic-badges-action@master
         with:
-          auth: ${{ secrets.COVERAGE_GIST}}
+          auth: ${{ secrets.GIST_SECRET}}
           gistID: 666285a58b7279abb160786318ac6a3c
           filename: restriction-enzymes-coverage.json
           label: Coverage
