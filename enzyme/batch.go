@@ -14,8 +14,12 @@ func NewRestrictionBatch(enzymes ...Enzyme) RestrictionBatch {
 	}
 }
 
-func (restrictionBatch *RestrictionBatch) Add(enzyme Enzyme) {
-	restrictionBatch.Enzymes = append(restrictionBatch.Enzymes, enzyme)
+func (restrictionBatch *RestrictionBatch) Add(enzyme ...Enzyme) {
+	restrictionBatch.Enzymes = append(restrictionBatch.Enzymes, enzyme...)
+}
+
+func (restrictionBatch *RestrictionBatch) AddBatch(batch RestrictionBatch) {
+	restrictionBatch.Enzymes = append(restrictionBatch.Enzymes, batch.Enzymes...)
 }
 
 /*
