@@ -49,6 +49,22 @@ func TestCutSeqLongSeqNewEnzyme(t *testing.T) {
 	}
 }
 
+func TestCutSeqWithWrappedSite(t *testing.T) {
+	seq1 := "TCNNNCACANNNNCTCTNGAGNNACCNNGGTC"
+
+	enzyme := FIXTURES["BsaI"]
+
+	index, _, strand := enzyme.GetNextRecognitionSite(seq1, 0, true)
+	if index != 28 {
+		t.Errorf("Expected 28, got %d", index)
+		return
+	}
+	if strand != constants.Watson {
+		t.Errorf("Expected Watson, got %s", strand)
+		return
+	}
+}
+
 var FIXTURES = map[string]Enzyme{
 	"BsaI":  {Name: "BsaI", Site: "GGTCTC", Length: 6, Substrate: "DNA", RegexpFor: regexp.MustCompile("GGTCTC"), RegexpRev: regexp.MustCompile("GAGACC"), OverhangLength: 0, OverhangSequence: "", NumberOfCuts: 2, CutType: "sticky", FivePrimeCutSite: 7, ThreePrimeCutSite: 11, FivePrimeCutSite2: 0, ThreePrimeCutSite2: 0, RebaseId: 313, InactivationTemperature: 0, OptimalTemperature: 0, Uri: "https://identifiers.org/rebase:313", Suppliers: []string{}, References: []string{"Flodman K., Xu S.-Y.;", "Fomenkov A.;", "Kong H., Chen Z.;", "Morgan R.D.;", "Xu S.-Y.;", "Zhu Z., Xu S.-Y.;", "Zhu Z., Xu S.-Y.;"}},
 	"EcoRI": {Name: "EcoRI", Site: "GAATTC", Length: 6, Substrate: "DNA", RegexpFor: regexp.MustCompile("GAATTC"), RegexpRev: regexp.MustCompile("GAATTC"), OverhangLength: 0, OverhangSequence: "", NumberOfCuts: 2, CutType: "sticky", FivePrimeCutSite: 1, ThreePrimeCutSite: 5, FivePrimeCutSite2: 0, ThreePrimeCutSite2: 0, RebaseId: 993, InactivationTemperature: 0, OptimalTemperature: 0, Uri: "https://identifiers.org/rebase:993", Suppliers: []string{}, References: []string{"Albertsen H.M., Le Paslier D., Abderrahim H., Dausset J., Cann H., ", "Cohen D.;", "Dugaiczyk A., Hedgpeth J., Boyer H.W., Goodman H.M.;", "Flodman K., Xu S.-Y.;", "Forrow S., Lee M., Souhami R.L., Hartley J.A.;", "Greene P.J., Betlach M.C., Boyer H.W., Goodman H.M.;", "Hedgpeth J., Goodman H.M., Boyer H.W.;", "Newman A.K., Rubin R.A., Kim S.H., Modrich P.;", "Pingoud A., Alves J., Fliess A., Geiger R., Rueter T., Wolfes H.;", "Tanaka M.;", "Winkler F.K.;"}},

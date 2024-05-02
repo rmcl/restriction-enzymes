@@ -68,26 +68,34 @@ func (enzyme *Enzyme) GetNextRecognitionSite(
 	isCircular bool,
 ) (int, *Enzyme, constants.Strand) {
 
-	sequence = sequence[offset:]
+	remainingSequence := sequence[offset:]
 
 	// If the enzyme is circular, we need to support the case where the
 	// recognition site spans the beginning and end of the sequence.
 	// To do this, we append the sequence to itself of length site - 1.
 	if isCircular {
-		sequence += sequence[:len(enzyme.Site)-1]
+		if len(sequence) > len(enzyme.Site) {
+			remainingSequence += sequence[:len(enzyme.Site)-1]
+		} else {
+			// If the sequence is shorter then the recognition site, we
+			// need to append the sequence to itself to avoid an index
+			// out of range error.
+			remainingSequence += sequence
+
+		}
 	}
 
 	var watsonMatchIndex int
 	var crickMatchIndex int
 
-	watsonMatch := enzyme.RegexpFor.FindStringIndex(sequence)
+	watsonMatch := enzyme.RegexpFor.FindStringIndex(remainingSequence)
 	if watsonMatch != nil {
 		watsonMatchIndex = watsonMatch[0] + offset
 	} else {
 		watsonMatchIndex = -1
 	}
 
-	crickMatch := enzyme.RegexpRev.FindStringIndex(sequence)
+	crickMatch := enzyme.RegexpRev.FindStringIndex(remainingSequence)
 	if crickMatch != nil {
 		crickMatchIndex = crickMatch[0] + offset
 	} else {
