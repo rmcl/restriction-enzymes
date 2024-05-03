@@ -102,8 +102,8 @@ func (dSeq *Dseq) Cut(enzyme Cutter) []Dseq {
 		enzyme := result.Enzyme
 
 		if result.Strand == constants.Watson {
-			watsonCutIndex = result.Position + enzyme.FivePrimeCutSite
-			crickCutIndex = result.Position + enzyme.ThreePrimeCutSite
+			watsonCutIndex = result.RecognitionSiteIndex + enzyme.FivePrimeCutSite
+			crickCutIndex = result.RecognitionSiteIndex + enzyme.ThreePrimeCutSite
 
 			fragment := Dseq{
 				Watson:   dSeq.Watson[lastWatsonCutIndex:watsonCutIndex],
@@ -117,8 +117,8 @@ func (dSeq *Dseq) Cut(enzyme Cutter) []Dseq {
 			nextSearchStart = watsonCutIndex
 
 		} else {
-			watsonCutIndex = result.Position + enzyme.Length - enzyme.ThreePrimeCutSite
-			crickCutIndex = result.Position + enzyme.Length - enzyme.FivePrimeCutSite
+			watsonCutIndex = result.RecognitionSiteIndex + enzyme.Length - enzyme.ThreePrimeCutSite
+			crickCutIndex = result.RecognitionSiteIndex + enzyme.Length - enzyme.FivePrimeCutSite
 			overhang := watsonCutIndex - crickCutIndex
 
 			fragment := Dseq{
@@ -129,7 +129,7 @@ func (dSeq *Dseq) Cut(enzyme Cutter) []Dseq {
 			}
 			fragments = append(fragments, fragment)
 
-			nextSearchStart = result.Position + 1
+			nextSearchStart = result.RecognitionSiteIndex + 1
 
 		}
 
