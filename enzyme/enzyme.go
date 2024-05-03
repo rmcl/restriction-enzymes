@@ -1,6 +1,7 @@
 package enzyme
 
 import (
+	"fmt"
 	"regexp"
 
 	"github.com/rmcl/restriction-enzymes/constants"
@@ -66,7 +67,7 @@ func (enzyme *Enzyme) GetNextRecognitionSite(
 	sequence string,
 	offset int,
 	isCircular bool,
-) (int, *Enzyme, constants.Strand) {
+) []RecognitionSiteResult {
 
 	remainingSequence := sequence[offset:]
 
@@ -75,6 +76,8 @@ func (enzyme *Enzyme) GetNextRecognitionSite(
 	// To do this, we append the sequence to itself of length site - 1.
 	if isCircular {
 		if len(sequence) > len(enzyme.Site) {
+			fmt.Println(enzyme)
+			fmt.Println("sequence", sequence, len(sequence), len(enzyme.Site))
 			remainingSequence += sequence[:len(enzyme.Site)-1]
 		} else {
 			// If the sequence is shorter then the recognition site, we
@@ -105,17 +108,41 @@ func (enzyme *Enzyme) GetNextRecognitionSite(
 	if watsonMatchIndex > -1 && crickMatchIndex > -1 {
 
 		if watsonMatchIndex <= crickMatchIndex {
-			return watsonMatchIndex, enzyme, constants.Watson
+			return []RecognitionSiteResult{
+				{
+					Enzyme:   enzyme,
+					Position: watsonMatchIndex,
+					Strand:   constants.Watson,
+				},
+			}
 		} else {
-			return crickMatchIndex, enzyme, constants.Crick
+			return []RecognitionSiteResult{
+				{
+					Enzyme:   enzyme,
+					Position: crickMatchIndex,
+					Strand:   constants.Crick,
+				},
+			}
 		}
 
 	} else if watsonMatchIndex > -1 {
-		return watsonMatchIndex, enzyme, constants.Watson
+		return []RecognitionSiteResult{
+			{
+				Enzyme:   enzyme,
+				Position: watsonMatchIndex,
+				Strand:   constants.Watson,
+			},
+		}
 	} else if crickMatchIndex > -1 {
-		return crickMatchIndex, enzyme, constants.Crick
+		return []RecognitionSiteResult{
+			{
+				Enzyme:   enzyme,
+				Position: crickMatchIndex,
+				Strand:   constants.Crick,
+			},
+		}
 	}
 
 	// No match found
-	return -1, nil, constants.Watson
+	return nil
 }
