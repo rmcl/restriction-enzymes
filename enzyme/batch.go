@@ -14,51 +14,34 @@ type RestrictionBatch struct {
 	revSiteToEnzyme map[string]*Enzyme
 }
 
+// Create a new restriction batch with the given enzymes.
 func NewRestrictionBatch(enzymes ...Enzyme) RestrictionBatch {
 	return RestrictionBatch{
 		Enzymes: enzymes,
 	}
 }
 
+// Add one or more enzymes to the restriction batch.
 func (restrictionBatch *RestrictionBatch) Add(enzyme ...Enzyme) {
 	restrictionBatch.Enzymes = append(restrictionBatch.Enzymes, enzyme...)
 	restrictionBatch.combinedRegex = nil
 }
 
+// Add all the enzymes from another restriction batch to this one.
 func (restrictionBatch *RestrictionBatch) AddBatch(batch RestrictionBatch) {
 	restrictionBatch.Enzymes = append(restrictionBatch.Enzymes, batch.Enzymes...)
 	restrictionBatch.combinedRegex = nil
 }
 
-func (restrictionBatch *RestrictionBatch) buildCombinedPattern() {
-	restrictionBatch.fwdSiteToEnzyme = make(map[string]*Enzyme)
-	restrictionBatch.revSiteToEnzyme = make(map[string]*Enzyme)
-
-	patternString := "("
-	for _, enzyme := range restrictionBatch.Enzymes {
-		patternString += "" + enzyme.RegexpFor.String() + "|" + enzyme.RegexpRev.String() + "|"
-
-		fwdSite := strings.ToLower(enzyme.RegexpFor.String()[4:])
-		revSite := strings.ToLower(enzyme.RegexpRev.String()[4:])
-
-		restrictionBatch.fwdSiteToEnzyme[fwdSite] = &enzyme
-		restrictionBatch.revSiteToEnzyme[revSite] = &enzyme
-	}
-	patternString = patternString[:len(patternString)-1] + ")"
-	restrictionBatch.combinedRegex = regexp.MustCompile(patternString)
-}
-
-type EnzymeCutSiteMatch struct {
-	Enzyme    *Enzyme
-	Positions []int // Should we change this to cut site? Right now its the start of the recognition site
-	//Strand    constants.Strand
-}
-
-func (enzymeBatch *RestrictionBatch) Search(
-	sequence string,
-	isCircular bool,
-) (map[string]EnzymeCutSiteMatch, error) {
-	enzymeCutSites := make(map[string]EnzymeCutSiteMatch)
+// Return a mapping of enzyme name to a list of sites in the sequence it cuts.
+// This returns the position of the cut site on the watson strand to mirror
+// Biopython's interface.
+//
+// If isCircular is true, the sequence is treated as circular and the
+// function will return a recognition site, even if it spans the
+// beginning and end of the sequence.
+func (enzymeBatch *RestrictionBatch) Search(sequence string, isCircular bool) (map[string][]int, error) {
+	watsonCutSitesByEnzyme := make(map[string][]int)
 
 	lastSitePosition := 0
 	for lastSitePosition >= 0 {
@@ -74,33 +57,27 @@ func (enzymeBatch *RestrictionBatch) Search(
 		}
 
 		for _, result := range results {
-			if matchRecord, ok := enzymeCutSites[result.Enzyme.Name]; ok {
-				matchRecord.Positions = append(matchRecord.Positions, result.Position)
-				enzymeCutSites[result.Enzyme.Name] = matchRecord
+			enzyme := result.Enzyme
+			if enzymeCutSites, ok := watsonCutSitesByEnzyme[result.Enzyme.Name]; ok {
+				enzymeCutSites = append(enzymeCutSites, result.WatsonCutIndex)
+				watsonCutSitesByEnzyme[result.Enzyme.Name] = enzymeCutSites
 			} else {
-				enzymeCutSites[result.Enzyme.Name] = EnzymeCutSiteMatch{
-					Enzyme:    result.Enzyme,
-					Positions: []int{result.Position},
-				}
+				watsonCutSitesByEnzyme[enzyme.Name] = []int{result.WatsonCutIndex}
 			}
 
-			lastSitePosition = result.Position + 1
+			lastSitePosition = result.RecognitionSiteIndex + 1
 		}
 	}
 
-	return enzymeCutSites, nil
+	return watsonCutSitesByEnzyme, nil
 }
 
-type RecognitionSiteResult struct {
-	Position int
-	Enzyme   *Enzyme
-	Strand   constants.Strand
-}
-
-/*
-Find the next recognition site in a sequence after the provided offset.
-that is cut by any of the enzymes in the batch.
-*/
+// Get the next recognition site in the sequence after the offset
+// for any enzyme in the batch.
+//
+// If isCircular is true, the sequence is treated as circular and the
+// function will return the next recognition site, even if it spans the
+// beginning and end of the sequence.
 func (restrictionBatch *RestrictionBatch) GetNextRecognitionSite(
 	sequence string,
 	offset int,
@@ -158,11 +135,15 @@ func (restrictionBatch *RestrictionBatch) GetNextRecognitionSite(
 		return nil
 	}
 
+	watsonCutIndex, crickCutIndex := enzyme.GetCutSitePositions(match[0]+offset, strand)
 	results := []RecognitionSiteResult{
 		{
-			Position: match[0] + offset,
-			Enzyme:   enzyme,
-			Strand:   strand,
+			RecognitionSiteIndex: match[0] + offset,
+			Enzyme:               enzyme,
+			Strand:               strand,
+
+			WatsonCutIndex: watsonCutIndex,
+			CrickCutIndex:  crickCutIndex,
 		},
 	}
 
@@ -178,13 +159,39 @@ func (restrictionBatch *RestrictionBatch) GetNextRecognitionSite(
 		additionalSite := searchSequence[match[0]:endIndex]
 		additionalEnzyme := restrictionBatch.fwdSiteToEnzyme[additionalSite]
 		if additionalEnzyme != nil {
+			watsonCutIndex, crickCutIndex := enzyme.GetCutSitePositions(match[0]+offset, strand)
 			results = append(results, RecognitionSiteResult{
-				Position: match[0] + offset,
-				Enzyme:   additionalEnzyme,
-				Strand:   strand,
+				RecognitionSiteIndex: match[0] + offset,
+				Enzyme:               additionalEnzyme,
+				Strand:               strand,
+
+				WatsonCutIndex: watsonCutIndex,
+				CrickCutIndex:  crickCutIndex,
 			})
 		}
 	}
 
 	return results
+}
+
+// Build a combined regular expression pattern for all the enzymes in the batch.
+// this private method is called when the combinedRegex is nil and is used to
+// build the combined pattern for all the enzymes in the batch. This is much
+// faster than searching for each enzyme individually.
+func (restrictionBatch *RestrictionBatch) buildCombinedPattern() {
+	restrictionBatch.fwdSiteToEnzyme = make(map[string]*Enzyme)
+	restrictionBatch.revSiteToEnzyme = make(map[string]*Enzyme)
+
+	patternString := "("
+	for _, enzyme := range restrictionBatch.Enzymes {
+		patternString += "" + enzyme.RegexpFor.String() + "|" + enzyme.RegexpRev.String() + "|"
+
+		fwdSite := strings.ToLower(enzyme.RegexpFor.String()[4:])
+		revSite := strings.ToLower(enzyme.RegexpRev.String()[4:])
+
+		restrictionBatch.fwdSiteToEnzyme[fwdSite] = &enzyme
+		restrictionBatch.revSiteToEnzyme[revSite] = &enzyme
+	}
+	patternString = patternString[:len(patternString)-1] + ")"
+	restrictionBatch.combinedRegex = regexp.MustCompile(patternString)
 }

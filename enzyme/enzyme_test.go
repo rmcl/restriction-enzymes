@@ -14,8 +14,8 @@ func TestGetNextRecognitionSite(t *testing.T) {
 	enzyme := FIXTURES["BsaI"]
 
 	result := enzyme.GetNextRecognitionSite(seq1, 0, true)
-	if result[0].Position != 2 {
-		t.Errorf("Expected 2, got %d", result[0].Position)
+	if result[0].RecognitionSiteIndex != 2 {
+		t.Errorf("Expected 2, got %d", result[0].RecognitionSiteIndex)
 		return
 	}
 	if result[0].Strand != constants.Watson {
@@ -24,8 +24,8 @@ func TestGetNextRecognitionSite(t *testing.T) {
 	}
 
 	result = enzyme.GetNextRecognitionSite(seq1, 3, true)
-	if result[0].Position != 22 {
-		t.Errorf("Expected 22, got %d", result[0].Position)
+	if result[0].RecognitionSiteIndex != 22 {
+		t.Errorf("Expected 22, got %d", result[0].RecognitionSiteIndex)
 		return
 	}
 	if result[0].Strand != constants.Crick {
@@ -41,8 +41,8 @@ func TestGetNextRecognitionSiteWithLowerCase(t *testing.T) {
 	enzyme := FIXTURES["BsaI"]
 
 	results := enzyme.GetNextRecognitionSite(seq1, 0, true)
-	if results[0].Position != 2 {
-		t.Errorf("Expected 2, got %d", results[0].Position)
+	if results[0].RecognitionSiteIndex != 2 {
+		t.Errorf("Expected 2, got %d", results[0].RecognitionSiteIndex)
 		return
 	}
 	if results[0].Strand != constants.Watson {
@@ -51,8 +51,8 @@ func TestGetNextRecognitionSiteWithLowerCase(t *testing.T) {
 	}
 
 	results = enzyme.GetNextRecognitionSite(seq1, 3, true)
-	if results[0].Position != 22 {
-		t.Errorf("Expected 22, got %d", results[0].Position)
+	if results[0].RecognitionSiteIndex != 22 {
+		t.Errorf("Expected 22, got %d", results[0].RecognitionSiteIndex)
 		return
 	}
 	if results[0].Strand != constants.Crick {
@@ -67,8 +67,8 @@ func TestCutSeqLongSeqNewEnzyme(t *testing.T) {
 
 	results := enzyme.GetNextRecognitionSite(EXAMPLE_SEQUENCE_1, 0, true)
 
-	if results[0].Position != 3807 {
-		t.Errorf("Expected 3807, got %d", results[0].Position)
+	if results[0].RecognitionSiteIndex != 3807 {
+		t.Errorf("Expected 3807, got %d", results[0].RecognitionSiteIndex)
 		return
 	}
 	if results[0].Strand != constants.Watson {
@@ -83,8 +83,8 @@ func TestCutSeqWithWrappedSite(t *testing.T) {
 	enzyme := FIXTURES["BsaI"]
 
 	results := enzyme.GetNextRecognitionSite(seq1, 0, true)
-	if results[0].Position != 28 {
-		t.Errorf("Expected 28, got %d", results[0].Position)
+	if results[0].RecognitionSiteIndex != 28 {
+		t.Errorf("Expected 28, got %d", results[0].RecognitionSiteIndex)
 		return
 	}
 	if results[0].Strand != constants.Watson {
@@ -98,8 +98,8 @@ func TestCutSeqRandomLongSequence(t *testing.T) {
 	enzyme := FIXTURES["BamHI"]
 
 	results := enzyme.GetNextRecognitionSite(EXAMPLE_SEQUENCE_2, 0, true)
-	if results[0].Position != 824 {
-		t.Errorf("Expected 824, got %d", results[0].Position)
+	if results[0].RecognitionSiteIndex != 824 {
+		t.Errorf("Expected 824, got %d", results[0].RecognitionSiteIndex)
 		return
 	}
 	if results[0].Strand != constants.Watson {

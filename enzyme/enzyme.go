@@ -56,13 +56,25 @@ type Enzyme struct {
 	References []string
 }
 
-/*
-Find the next recognition site in a sequence after the provided offset.
+// A struct to hold a single recognition site result in a sequence.
+type RecognitionSiteResult struct {
+	Enzyme *Enzyme
 
-If the enzyme is circular, the sequence is treated as circular and the
-function will return the next recognition site, even if it spans the
-beginning and end of the sequence.
-*/
+	// The position of the start of the recognition site in the sequence.
+	RecognitionSiteIndex int
+	Strand               constants.Strand
+
+	// The position of the cut site on the watson strand in the sequence.
+	WatsonCutIndex int
+	// The position of the cut site on the watson strand in the sequence.
+	CrickCutIndex int
+}
+
+// Get the next recognition site in the sequence after the offset
+//
+// If isCircular is true, the sequence is treated as circular and the
+// function will return the next recognition site, even if it spans the
+// beginning and end of the sequence.
 func (enzyme *Enzyme) GetNextRecognitionSite(
 	sequence string,
 	offset int,
@@ -105,44 +117,90 @@ func (enzyme *Enzyme) GetNextRecognitionSite(
 		crickMatchIndex = -1
 	}
 
+	var strand constants.Strand
+	var position int
+
 	if watsonMatchIndex > -1 && crickMatchIndex > -1 {
-
 		if watsonMatchIndex <= crickMatchIndex {
-			return []RecognitionSiteResult{
-				{
-					Enzyme:   enzyme,
-					Position: watsonMatchIndex,
-					Strand:   constants.Watson,
-				},
-			}
+			strand = constants.Watson
+			position = watsonMatchIndex
 		} else {
-			return []RecognitionSiteResult{
-				{
-					Enzyme:   enzyme,
-					Position: crickMatchIndex,
-					Strand:   constants.Crick,
-				},
-			}
+			strand = constants.Crick
+			position = crickMatchIndex
+		}
+	} else if watsonMatchIndex > -1 {
+		strand = constants.Watson
+		position = watsonMatchIndex
+	} else if crickMatchIndex > -1 {
+		strand = constants.Crick
+		position = crickMatchIndex
+	} else {
+		// No match found
+		return nil
+	}
+
+	watsonIndex, crickIndex := enzyme.GetCutSitePositions(watsonMatchIndex, strand)
+	return []RecognitionSiteResult{
+		{
+			Enzyme: enzyme,
+
+			RecognitionSiteIndex: position,
+			Strand:               strand,
+
+			WatsonCutIndex: watsonIndex,
+			CrickCutIndex:  crickIndex,
+		},
+	}
+}
+
+// Given a recognition site index and a strand, return the position of the cut sites
+// on the watson and crick strands. The first int is the watson strand index and the second
+// is the crick strand index.
+func (enzyme *Enzyme) GetCutSitePositions(recognitionSiteIndex int, strand constants.Strand) (int, int) {
+	var watsonCutIndex, crickCutIndex int
+
+	if strand == constants.Watson {
+		watsonCutIndex = recognitionSiteIndex + enzyme.FivePrimeCutSite
+		crickCutIndex = recognitionSiteIndex + enzyme.ThreePrimeCutSite
+	} else {
+		watsonCutIndex = recognitionSiteIndex + enzyme.Length - enzyme.ThreePrimeCutSite
+		crickCutIndex = recognitionSiteIndex + enzyme.Length - enzyme.FivePrimeCutSite
+	}
+
+	return watsonCutIndex, crickCutIndex
+}
+
+// Return a list of cut sites for the enzyme. This returns the position of the cut site
+// on the watson strand to mirror Biopython
+//
+// If isCircular is true, the sequence is treated as circular and the function will
+// return a recognition site even if it spans the beginning and end of the sequence.
+func (enzyme *Enzyme) Search(
+	sequence string,
+	isCircular bool,
+) ([]int, error) {
+
+	watsonCutSites := make([]int, 0)
+
+	lastSitePosition := 0
+	for lastSitePosition >= 0 {
+
+		results := enzyme.GetNextRecognitionSite(
+			sequence,
+			lastSitePosition,
+			isCircular,
+		)
+
+		if results == nil {
+			break
 		}
 
-	} else if watsonMatchIndex > -1 {
-		return []RecognitionSiteResult{
-			{
-				Enzyme:   enzyme,
-				Position: watsonMatchIndex,
-				Strand:   constants.Watson,
-			},
-		}
-	} else if crickMatchIndex > -1 {
-		return []RecognitionSiteResult{
-			{
-				Enzyme:   enzyme,
-				Position: crickMatchIndex,
-				Strand:   constants.Crick,
-			},
+		for _, result := range results {
+			watsonCutSites = append(watsonCutSites, result.WatsonCutIndex)
+
+			lastSitePosition = result.RecognitionSiteIndex + 1
 		}
 	}
 
-	// No match found
-	return nil
+	return watsonCutSites, nil
 }
