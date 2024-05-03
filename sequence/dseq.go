@@ -60,7 +60,7 @@ func NewDseq(watson, crick string, overhang int, geometry constants.SequenceGeom
 }
 
 type Cutter interface {
-	GetNextRecognitionSite(sequence string, offset int, isCircular bool) (int, *enzyme.Enzyme, constants.Strand)
+	GetNextRecognitionSite(sequence string, offset int, isCircular bool) []enzyme.RecognitionSiteResult
 }
 
 /*
@@ -84,20 +84,26 @@ func (dSeq *Dseq) Cut(enzyme Cutter) []Dseq {
 	lastWatsonCutIndex := 0
 
 	for {
-		siteIndex, enzyme, strand := enzyme.GetNextRecognitionSite(
+		results := enzyme.GetNextRecognitionSite(
 			dSeq.Watson,
 			nextSearchStart,
 			dSeq.Geometry == constants.Circular,
 		)
-		if siteIndex == -1 {
+		if results == nil {
 			break
 		}
 
 		var watsonCutIndex, crickCutIndex int
 
-		if strand == constants.Watson {
-			watsonCutIndex = siteIndex + enzyme.FivePrimeCutSite
-			crickCutIndex = siteIndex + enzyme.ThreePrimeCutSite
+		if len(results) > 1 {
+			fmt.Println("Warning: multiple recognition sites found. Only the first site will be used.")
+		}
+		result := results[0]
+		enzyme := result.Enzyme
+
+		if result.Strand == constants.Watson {
+			watsonCutIndex = result.RecognitionSiteIndex + enzyme.FivePrimeCutSite
+			crickCutIndex = result.RecognitionSiteIndex + enzyme.ThreePrimeCutSite
 
 			fragment := Dseq{
 				Watson:   dSeq.Watson[lastWatsonCutIndex:watsonCutIndex],
@@ -111,8 +117,8 @@ func (dSeq *Dseq) Cut(enzyme Cutter) []Dseq {
 			nextSearchStart = watsonCutIndex
 
 		} else {
-			watsonCutIndex = siteIndex + enzyme.Length - enzyme.ThreePrimeCutSite
-			crickCutIndex = siteIndex + enzyme.Length - enzyme.FivePrimeCutSite
+			watsonCutIndex = result.RecognitionSiteIndex + enzyme.Length - enzyme.ThreePrimeCutSite
+			crickCutIndex = result.RecognitionSiteIndex + enzyme.Length - enzyme.FivePrimeCutSite
 			overhang := watsonCutIndex - crickCutIndex
 
 			fragment := Dseq{
@@ -123,7 +129,7 @@ func (dSeq *Dseq) Cut(enzyme Cutter) []Dseq {
 			}
 			fragments = append(fragments, fragment)
 
-			nextSearchStart = siteIndex + 1
+			nextSearchStart = result.RecognitionSiteIndex + 1
 
 		}
 
