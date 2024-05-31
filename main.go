@@ -25,11 +25,19 @@ func main() {
 		panic(err)
 	}
 
-	enzymes, err := script.ProcessRebaseFiles(tempDir, version)
+	data, err := script.ProcessRebaseFiles(tempDir, version)
 	if err != nil {
 		panic(err)
 	}
 
 	outputGoFilePath := "./db/enzyme_db.go"
-	script.CreateGoEnzymeDBFile(enzymes, outputGoFilePath)
+	outputGoSupplierFilePath := "./db/suppliers.go"
+	err = script.CreateGoEnzymeDBFile(data, outputGoFilePath)
+	if err != nil {
+		panic(err)
+	}
+	err = script.CreateGoEnzymeSupplierFile(data, outputGoSupplierFilePath)
+	if err != nil {
+		panic(err)
+	}
 }

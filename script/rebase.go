@@ -245,7 +245,7 @@ func processBairochFile(bairochFp io.Reader, enzymes *map[string]enzyme.Enzyme) 
 		enzymeId := record["ID"][0]
 
 		if _, ok := (*enzymes)[enzymeId]; !ok {
-			fmt.Printf("enzyme present in bairoch file, but not in enzyme definitions: '%s'", enzymeId)
+			fmt.Println("enzyme present in bairoch file, but not in enzyme definitions: ", enzymeId)
 
 			// For some reason there is at least one enzyme present in the bairoch file
 			// but not in the enzyme definitions. Ignoring and going on with the rest for now.
@@ -274,15 +274,162 @@ func processBairochFile(bairochFp io.Reader, enzymes *map[string]enzyme.Enzyme) 
 	return nil
 }
 
+/*
+	Process the emboss_s.### file
+
+The file is composed of a header with # followed by supplier records
+
+Code of Supplier<ws>Supplier name
+
+	Record Example
+
+B Thermo Fisher Scientific
+*/
+func processSupplierFile(supplierFp io.Reader) (map[string]string, error) {
+
+	suppliers := make(map[string]string)
+
+	supplierRecordPattern := regexp.MustCompile(`^([a-zA-Z]+) (.+)`)
+
+	scanner := bufio.NewScanner(supplierFp)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Skip comment lines
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		matches := supplierRecordPattern.FindStringSubmatch(line)
+		if len(matches) != 3 {
+			continue
+		}
+
+		supplierCode := matches[1]
+		supplierName := matches[2]
+
+		suppliers[supplierCode] = supplierName
+	}
+
+	return suppliers, nil
+}
+
+/*
+	Process the emboss_r.### file
+
+The file is composed of a header with # followed by reference records
+
+# Format:
+# Line 1: Name of Enzyme
+# Line 2: Organism
+# Line 3: Isoschizomers
+# Line 4: Methylation
+# Line 5: Source
+# Line 6: Suppliers
+# Line 7: Number of following references
+# Lines 8..n: References
+# // (end of entry marker)
+
+	Record Example
+AanI
+Arthrobacter aurescens RFL2
+
+
+Fermentas G324
+B
+1
+Vitkute, J., Lapcinskaja, S., Capskaja, L., Zakareviciene, L., Janulaitis, A., Unpublished observations.
+//
+
+*/
+
+type ReferenceRecord struct {
+	EnzymeName    string
+	Organism      string
+	Isoschizomers string
+	Methylation   string
+	Source        string
+	Suppliers     []string
+	References    []string
+}
+
+func getNextReferencesFileRecord(scanner *bufio.Scanner) (*ReferenceRecord, error) {
+	record := ReferenceRecord{}
+
+	currentLine := 0
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Skip comment lines
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Check for end of record
+		if line == "//" {
+			return &record, nil
+		}
+
+		switch currentLine {
+		case 0:
+			record.EnzymeName = line
+		case 1:
+			record.Organism = line
+		case 2:
+			record.Isoschizomers = line
+		case 3:
+			record.Methylation = line
+		case 4:
+			record.Source = line
+		case 5:
+			record.Suppliers = strings.Split(line, "")
+		case 6:
+			// Number of references
+			_, err := strconv.Atoi(line)
+			if err != nil {
+				return nil, err
+			}
+
+		default:
+			record.References = append(record.References, line)
+		}
+		currentLine++
+	}
+	return nil, io.EOF
+}
+
+func processReferencesFile(referencesFp io.Reader) (map[string]ReferenceRecord, error) {
+	scanner := bufio.NewScanner(referencesFp)
+	references := make(map[string]ReferenceRecord)
+	for {
+		record, err := getNextReferencesFileRecord(scanner)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		references[record.EnzymeName] = *record
+	}
+	return references, nil
+}
+
+type RebaseData struct {
+	Enzymes    map[string]enzyme.Enzyme
+	Suppliers  map[string]string
+	References map[string]ReferenceRecord
+}
+
 func ProcessRebaseFiles(
 	rebaseInputDir,
 	version string,
-) (map[string]enzyme.Enzyme, error) {
+) (*RebaseData, error) {
 	enzymes := make(map[string]enzyme.Enzyme)
 
 	enzymeFilePath := filepath.Join(rebaseInputDir, "emboss_e."+version)
-	//supplierFilePath := filepath.Join(rebaseDir, "emboss_s."+version)
-	//referenceFilePath := filepath.Join(rebaseDir, "emboss_r."+version)
+	supplierFilePath := filepath.Join(rebaseInputDir, "emboss_s."+version)
+	referenceFilePath := filepath.Join(rebaseInputDir, "emboss_r."+version)
 	bairochFilePath := filepath.Join(rebaseInputDir, "bairoch."+version)
 
 	eFP, err := os.Open(enzymeFilePath)
@@ -304,7 +451,32 @@ func ProcessRebaseFiles(
 		return nil, err
 	}
 
-	return enzymes, nil
+	sFP, err := os.Open(supplierFilePath)
+	if err != nil {
+		return nil, err
+	}
+	suppliers, err := processSupplierFile(sFP)
+	if err != nil {
+		return nil, err
+	}
+
+	// Process Reference File
+	rFP, err := os.Open(referenceFilePath)
+	if err != nil {
+		return nil, err
+	}
+	references, err := processReferencesFile(rFP)
+	if err != nil {
+		return nil, err
+	}
+
+	data := RebaseData{
+		Enzymes:    enzymes,
+		Suppliers:  suppliers,
+		References: references,
+	}
+
+	return &data, nil
 }
 
 func WriteEnzymeJSON(enzymes []enzyme.Enzyme, outputFilePath string) error {

@@ -3,7 +3,7 @@ package script
 import (
 	"bytes"
 	"os"
-	"strings"
+	"sort"
 	"text/template"
 
 	"github.com/rmcl/restriction-enzymes/enzyme"
@@ -26,62 +26,89 @@ import (
 )
 
 var Enzymes = map[string]enzyme.Enzyme{
-	{{.Enzymes}}
+{{.Enzymes}}
 }
 `
 
-const enzymeRecordTemplate = `"{{.Enzyme.Name}}":{` +
-	`Name:"{{.Enzyme.Name}}",` +
-	`Site:"{{.Enzyme.Site}}",` +
-	`Length:{{.Enzyme.Length}},` +
-	`Substrate:"{{.Enzyme.Substrate}}",` +
-	`RegexpFor:regexp.MustCompile("{{.Enzyme.RegexpFor}}"),` +
-	`RegexpRev:regexp.MustCompile("{{.Enzyme.RegexpRev}}"),` +
-	`OverhangLength:{{.Enzyme.OverhangLength}},` +
-	`OverhangSequence:"{{.Enzyme.OverhangSequence}}",` +
-	`NumberOfCuts:{{.Enzyme.NumberOfCuts}},` +
-	`CutType:"{{.Enzyme.CutType}}",` +
-	`FivePrimeCutSite:{{.Enzyme.FivePrimeCutSite}},` +
-	`ThreePrimeCutSite:{{.Enzyme.ThreePrimeCutSite}},` +
-	`FivePrimeCutSite2:{{.Enzyme.FivePrimeCutSite2}},` +
-	`ThreePrimeCutSite2:{{.Enzyme.ThreePrimeCutSite2}},` +
-	`RebaseId:{{.Enzyme.RebaseId}},` +
-	`InactivationTemperature:{{.Enzyme.InactivationTemperature}},` +
-	`OptimalTemperature:{{.Enzyme.OptimalTemperature}},` +
-	`Uri:"{{.Enzyme.Uri}}",` +
-	`Suppliers: []string{ {{.Suppliers}} },` +
-	`References: []string{ {{.References}} },` +
-	`},`
+const supplierFileTemplate = `
+/*
+This file contains a list of Reagenet Suppliers and the restriction enzymes they supply. The data comes from the REBASE database.
 
-type SerializableEnzymeRecord struct {
-	Enzyme     enzyme.Enzyme
-	References string
-	Suppliers  string
+THIS FILE IS AUTO-GENERATED. DO NOT MODIFY THIS FILE MANUALLY.
+
+To update the database, run the script in the script directory.
+
+*/
+package db
+
+type SupplierRecord struct {
+	Id   string
+	Name string
+	Enzymes      []string
 }
 
-func NewSerializableEnzymeRecord(e enzyme.Enzyme) SerializableEnzymeRecord {
-	references := ""
-	if len(e.References) > 0 {
-		references = "\"" + strings.Join(e.References, "\", \"") + "\""
-	}
-	suppliers := ""
-	if len(e.Suppliers) > 0 {
-		suppliers = "\"" + strings.Join(e.Suppliers, "\", \"") + "\""
+var Suppliers = []SupplierRecord{
+{{.Suppliers}}
+}
+`
+const supplierRecordTemplate = `{` +
+	`Id:"{{.SupplierId}}", ` +
+	`Name:"{{.SupplierName}}", ` +
+	`Enzymes: []string{ {{formatStringList .Enzymes}} },` +
+	`},`
+
+const enzymeRecordTemplate = `"{{.Name}}":{` +
+	`Name:"{{.Name}}",` +
+	`Site:"{{.Site}}",` +
+	`Length:{{.Length}},` +
+	`Substrate:"{{.Substrate}}",` +
+	`RegexpFor:regexp.MustCompile("{{.RegexpFor}}"),` +
+	`RegexpRev:regexp.MustCompile("{{.RegexpRev}}"),` +
+	`OverhangLength:{{.OverhangLength}},` +
+	`OverhangSequence:"{{.OverhangSequence}}",` +
+	`NumberOfCuts:{{.NumberOfCuts}},` +
+	`CutType:"{{.CutType}}",` +
+	`FivePrimeCutSite:{{.FivePrimeCutSite}},` +
+	`ThreePrimeCutSite:{{.ThreePrimeCutSite}},` +
+	`FivePrimeCutSite2:{{.FivePrimeCutSite2}},` +
+	`ThreePrimeCutSite2:{{.ThreePrimeCutSite2}},` +
+	`RebaseId:{{.RebaseId}},` +
+	`InactivationTemperature:{{.InactivationTemperature}},` +
+	`OptimalTemperature:{{.OptimalTemperature}},` +
+	`Uri:"{{.Uri}}",` +
+	`Suppliers: []string{ {{formatStringList .Suppliers}} },` +
+	`References: []string{ {{formatStringList .References}} },` +
+	`},`
+
+// formatStringList takes a list of strings and returns a string with each string in the list
+// wrapped in double quotes and separated by commas.
+func formatStringList(stringList []string) string {
+	output := ""
+	for _, s := range stringList {
+		output += "\"" + s + "\", "
 	}
 
-	return SerializableEnzymeRecord{
-		Enzyme:     e,
-		References: references,
-		Suppliers:  suppliers,
+	if len(output) > 2 {
+		output = output[:len(output)-2]
 	}
+	return output
 }
 
 type DBFileTemplateData struct {
 	Enzymes string
 }
 
-func serializeEnzymeRecord(enzyme enzyme.Enzyme) (string, error) {
-	recordTemplate, err := template.New("source").Parse(enzymeRecordTemplate)
+type SupplierFileTemplateData struct {
+	Suppliers string
+}
+
+// Give a template and data, parse the template and return the result as a string.
+func parseTemplate(templateStr string, data interface{}) (string, error) {
+	funcMap := template.FuncMap{
+		"formatStringList": formatStringList,
+	}
+
+	recordTemplate, err := template.New("source").Funcs(funcMap).Parse(templateStr)
 	if err != nil {
 		return "", err
 	}
@@ -90,7 +117,7 @@ func serializeEnzymeRecord(enzyme enzyme.Enzyme) (string, error) {
 
 	err = recordTemplate.Execute(
 		&output,
-		NewSerializableEnzymeRecord(enzyme))
+		data)
 
 	if err != nil {
 		return "", err
@@ -99,10 +126,10 @@ func serializeEnzymeRecord(enzyme enzyme.Enzyme) (string, error) {
 	return output.String(), nil
 }
 
-func createEnzymeFileString(enzymes map[string]enzyme.Enzyme) (string, error) {
+func createEnzymeFile(enzymes map[string]enzyme.Enzyme) (string, error) {
 	records := ""
 	for _, enzyme := range enzymes {
-		recordString, err := serializeEnzymeRecord(enzyme)
+		recordString, err := parseTemplate(enzymeRecordTemplate, enzyme)
 		if err != nil {
 			return "", err
 		}
@@ -110,21 +137,85 @@ func createEnzymeFileString(enzymes map[string]enzyme.Enzyme) (string, error) {
 		records += "\t" + recordString + "\n"
 	}
 
-	fileTemplate, err := template.New("source").Parse(dbFileTemplate)
+	return parseTemplate(dbFileTemplate, DBFileTemplateData{
+		Enzymes: records,
+	})
+}
+
+type SupplierRecord struct {
+	SupplierId   string
+	SupplierName string
+	Enzymes      []string
+}
+
+func buildEnzymeSupplierRecords(rebaseData *RebaseData) ([]SupplierRecord, error) {
+
+	// Create a mapping of Supplier 1 letter code to a list of enzyme names
+	enzymeNamesBySupplierId := map[string][]string{}
+	for _, reference := range rebaseData.References {
+		for _, supplierId := range reference.Suppliers {
+			enzymeNamesBySupplierId[supplierId] = append(
+				enzymeNamesBySupplierId[supplierId],
+				reference.EnzymeName)
+		}
+	}
+
+	supplierRecords := []SupplierRecord{}
+
+	for supplierId, enzymeNames := range enzymeNamesBySupplierId {
+		sr := SupplierRecord{
+			SupplierId:   supplierId,
+			SupplierName: rebaseData.Suppliers[supplierId],
+			Enzymes:      enzymeNames,
+		}
+		supplierRecords = append(supplierRecords, sr)
+	}
+
+	// Sort the supplier records by supplier name
+	sort.Slice(supplierRecords, func(i, j int) bool {
+		return supplierRecords[i].SupplierId < supplierRecords[j].SupplierId
+	})
+
+	return supplierRecords, nil
+}
+
+func createEnzymeSupplierFile(rebaseData *RebaseData) (string, error) {
+	supplierRecords, err := buildEnzymeSupplierRecords(rebaseData)
 	if err != nil {
 		return "", err
 	}
 
-	var buffer bytes.Buffer
-	fileTemplate.Execute(&buffer, DBFileTemplateData{
-		Enzymes: records,
-	})
+	records := ""
+	for _, supplierRecord := range supplierRecords {
+		recordString, err := parseTemplate(supplierRecordTemplate, supplierRecord)
+		if err != nil {
+			return "", err
+		}
 
-	return buffer.String(), nil
+		records += "\t" + recordString + "\n"
+	}
+
+	return parseTemplate(supplierFileTemplate, SupplierFileTemplateData{
+		Suppliers: records,
+	})
 }
 
-func CreateGoEnzymeDBFile(enzymes map[string]enzyme.Enzyme, outputFilePath string) error {
-	fileString, err := createEnzymeFileString(enzymes)
+func CreateGoEnzymeDBFile(rebaseData *RebaseData, outputFilePath string) error {
+	fileString, err := createEnzymeFile(rebaseData.Enzymes)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(outputFilePath, []byte(fileString), 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func CreateGoEnzymeSupplierFile(rebaseData *RebaseData, outputFilePath string) error {
+	fileString, err := createEnzymeSupplierFile(rebaseData)
 	if err != nil {
 		return err
 	}
