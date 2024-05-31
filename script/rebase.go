@@ -143,8 +143,8 @@ func processEnzymeFile(enzymeFp io.Reader, enzymes *map[string]enzyme.Enzyme) er
 			Site: matches[2],
 
 			Length:    intMatches[0],
-			RegexpFor: regexp.MustCompile(matches[2]),
-			RegexpRev: regexp.MustCompile(transform.ReverseComplement(matches[2])),
+			RegexpFor: regexp.MustCompile("(?i)" + matches[2]),
+			RegexpRev: regexp.MustCompile("(?i)" + transform.ReverseComplement(matches[2])),
 
 			NumberOfCuts: cuts,
 			CutType:      cutType,

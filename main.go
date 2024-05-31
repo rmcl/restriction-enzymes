@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/rmcl/restriction-enzymes/script"
@@ -13,9 +14,12 @@ func getTempDir() string {
 
 func main() {
 
-	version := "404"
+	version := "405"
 
 	tempDir := getTempDir()
+
+	fmt.Println("Downloading files from REBASE FTP to: ", tempDir)
+
 	err := script.RetrieveRebaseFiles(version, tempDir)
 	if err != nil {
 		panic(err)

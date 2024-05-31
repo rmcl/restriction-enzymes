@@ -10,7 +10,14 @@ import (
 )
 
 const dbFileTemplate = `
-/* THIS FILE IS AUTO-GENERATED. DO NOT MODIFY THIS FILE MANUALLY */
+/*
+Package db contains a map of enzyme names to enzyme.Enzyme structs pulled from the REBASE database.
+
+THIS FILE IS AUTO-GENERATED. DO NOT MODIFY THIS FILE MANUALLY.
+
+To update the database, run the script in the script directory.
+
+*/
 package db
 
 import (
