@@ -51,8 +51,6 @@ type Enzyme struct {
 
 	Uri string
 
-	Suppliers []string
-
 	References []string
 }
 

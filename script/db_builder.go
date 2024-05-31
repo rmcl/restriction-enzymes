@@ -76,7 +76,6 @@ const enzymeRecordTemplate = `"{{.Name}}":{` +
 	`InactivationTemperature:{{.InactivationTemperature}},` +
 	`OptimalTemperature:{{.OptimalTemperature}},` +
 	`Uri:"{{.Uri}}",` +
-	`Suppliers: []string{ {{formatStringList .Suppliers}} },` +
 	`References: []string{ {{formatStringList .References}} },` +
 	`},`
 
