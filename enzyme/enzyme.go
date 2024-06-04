@@ -1,7 +1,6 @@
 package enzyme
 
 import (
-	"fmt"
 	"regexp"
 
 	"github.com/rmcl/restriction-enzymes/constants"
@@ -86,8 +85,6 @@ func (enzyme *Enzyme) GetNextRecognitionSite(
 	// To do this, we append the sequence to itself of length site - 1.
 	if isCircular {
 		if len(sequence) > len(enzyme.Site) {
-			fmt.Println(enzyme)
-			fmt.Println("sequence", sequence, len(sequence), len(enzyme.Site))
 			remainingSequence += sequence[:len(enzyme.Site)-1]
 		} else {
 			// If the sequence is shorter then the recognition site, we
