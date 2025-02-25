@@ -134,7 +134,7 @@ func (enzyme *Enzyme) GetNextRecognitionSite(
 		return nil
 	}
 
-	watsonIndex, crickIndex := enzyme.GetCutSitePositions(watsonMatchIndex, strand)
+	watsonIndex, crickIndex := enzyme.GetCutSitePositions(position, strand)
 	return []RecognitionSiteResult{
 		{
 			Enzyme: enzyme,
