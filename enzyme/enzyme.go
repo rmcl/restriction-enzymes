@@ -91,7 +91,6 @@ func (enzyme *Enzyme) GetNextRecognitionSite(
 			// need to append the sequence to itself to avoid an index
 			// out of range error.
 			remainingSequence += sequence
-
 		}
 	}
 

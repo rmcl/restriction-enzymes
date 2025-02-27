@@ -89,3 +89,45 @@ func TestCutWithRestrictionBatch(t *testing.T) {
 		t.Errorf("Expected fragments %v, got %v", expected, actual)
 	}
 }
+
+func TestCutWithRestrictionBatchCircularCutLoop(t *testing.T) {
+	// GGTCTC cut site should wrap around
+	dSeq1 := NewFromWatsonStrand("AAAGGTCTCNCACANNNNCCAA", constants.Circular)
+
+	// AAAGGTCTCN
+	// TTTCCAGAGNGTGT
+
+	// CACANNNNCCAA
+	//     NNNNGGTT
+
+	batch := enzyme.NewRestrictionBatch(
+		db.Enzymes["BsaI"],
+	)
+
+	results := dSeq1.Cut(&batch)
+
+	if len(results) != 2 {
+		t.Errorf("Expected 2 fragment, got %d", len(results))
+		t.Fail()
+	}
+
+	if results[0].Watson != "AAAGGTCTCN" {
+		t.Errorf("Expected AAAGGTCTCN, got %s", results[0].Watson)
+		t.Fail()
+	}
+
+	if results[0].Crick != "TTTCCAGAGNGTGT" {
+		t.Errorf("Expected TTTCCAGAGNGTGT, got %s", results[0].Crick)
+		t.Fail()
+	}
+
+	if results[1].Watson != "CACANNNNCCAA" {
+		t.Errorf("Expected CACANNNNCCAA, got %s", results[1].Watson)
+		t.Fail()
+	}
+	if results[1].Crick != "NNNNGGTT" {
+		t.Errorf("Expected NNNNGGTT, got %s", results[1].Crick)
+		t.Fail()
+	}
+
+}

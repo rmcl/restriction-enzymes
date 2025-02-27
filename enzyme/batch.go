@@ -120,7 +120,7 @@ func (restrictionBatch *RestrictionBatch) GetNextRecognitionSite(
 
 	// If the match is beyond the original sequence length, we
 	// should ignore it
-	if match[0] >= originalSequenceLength {
+	if match[0]+offset >= originalSequenceLength {
 		return nil
 	}
 

@@ -109,7 +109,7 @@ func (dSeq *Dseq) Cut(enzyme Cutter) []Dseq {
 				Watson:   dSeq.Watson[lastWatsonCutIndex:watsonCutIndex],
 				Crick:    dSeq.Crick[lastCrickCutIndex:crickCutIndex],
 				Overhang: lastOverhang,
-				Geometry: dSeq.Geometry,
+				Geometry: constants.Linear,
 			}
 			fragments = append(fragments, fragment)
 
@@ -125,7 +125,7 @@ func (dSeq *Dseq) Cut(enzyme Cutter) []Dseq {
 				Watson:   dSeq.Watson[lastWatsonCutIndex:watsonCutIndex],
 				Crick:    dSeq.Crick[lastCrickCutIndex:crickCutIndex],
 				Overhang: overhang,
-				Geometry: dSeq.Geometry,
+				Geometry: constants.Linear,
 			}
 			fragments = append(fragments, fragment)
 
