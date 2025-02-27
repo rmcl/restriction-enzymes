@@ -131,3 +131,21 @@ func TestCutWithRestrictionBatchCircularCutLoop(t *testing.T) {
 	}
 
 }
+
+func TestRandomSequenceNotWorking(t *testing.T) {
+	// Note this behavior is a little unclear. It really seems to depend on the enzyme what happens when
+	// the recognition site is at the end or beginning of a linear molecule. It may be that no cut occurs.
+	seq := "GGTCTCTGTCAGCTCGTACCCTTGCatactacggtctcaaggaGCGGAACTGCCGCCGATTGTGGTGGAAGCGGTGGAACGCCTGAAAGAAGCGGGCATCGAAGTCGAAGTTGAAAAGAAAGACGGCGAAATTATCATCAAAGTGAAAGTGGAAACCGAAGAGGAAGAAGAACTGGTCGCGGAAGAAATTGTTCGCCTGGAGAAAGAATTCGGCAAAGTTGAGGTGGAAATTTATCCGGATGGCGAAATCGAAATTCGCATTGAACTGggttcccgagaccgtaatgcCTGTACTTCATCTTTAAAGGTCTC"
+	dSeq := NewFromWatsonStrand(seq, constants.Linear)
+
+	batch := enzyme.NewRestrictionBatch(
+		db.Enzymes["BsaI"],
+	)
+
+	results := dSeq.Cut(&batch)
+
+	if len(results) != 5 {
+		t.Errorf("Expected 5 fragment, got %d", len(results))
+		t.Fail()
+	}
+}

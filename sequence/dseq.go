@@ -105,6 +105,14 @@ func (dSeq *Dseq) Cut(enzyme Cutter) []Dseq {
 			watsonCutIndex = result.RecognitionSiteIndex + enzyme.FivePrimeCutSite
 			crickCutIndex = result.RecognitionSiteIndex + enzyme.ThreePrimeCutSite
 
+			if watsonCutIndex >= len(dSeq.Watson) {
+				watsonCutIndex = len(dSeq.Watson)
+			}
+
+			if crickCutIndex >= len(dSeq.Crick) {
+				crickCutIndex = len(dSeq.Crick)
+			}
+
 			fragment := Dseq{
 				Watson:   dSeq.Watson[lastWatsonCutIndex:watsonCutIndex],
 				Crick:    dSeq.Crick[lastCrickCutIndex:crickCutIndex],
