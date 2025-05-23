@@ -88,6 +88,10 @@ func (restrictionBatch *RestrictionBatch) GetNextRecognitionSite(
 		return nil
 	}
 
+	if restrictionBatch.Enzymes == nil || len(restrictionBatch.Enzymes) == 0 {
+		return nil
+	}
+
 	if restrictionBatch.combinedRegex == nil {
 		restrictionBatch.buildCombinedPattern()
 	}
@@ -215,6 +219,11 @@ func (restrictionBatch *RestrictionBatch) getResultsForMatchSite(
 func (restrictionBatch *RestrictionBatch) buildCombinedPattern() {
 	restrictionBatch.fwdSiteToEnzyme = make(map[string][]*Enzyme)
 	restrictionBatch.revSiteToEnzyme = make(map[string][]*Enzyme)
+
+	if len(restrictionBatch.Enzymes) == 0 {
+		restrictionBatch.combinedRegex = nil
+		return
+	}
 
 	patternString := "("
 	for _, enzyme := range restrictionBatch.Enzymes {
