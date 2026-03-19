@@ -2,6 +2,7 @@ package enzyme
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/rmcl/restriction-enzymes/constants"
@@ -12,6 +13,7 @@ type RestrictionBatch struct {
 	combinedRegex   *regexp.Regexp
 	fwdSiteToEnzyme map[string][]*Enzyme
 	revSiteToEnzyme map[string][]*Enzyme
+	orderedEnzymes  []*Enzyme
 }
 
 // Create a new restriction batch with the given enzymes.
@@ -117,96 +119,80 @@ func (restrictionBatch *RestrictionBatch) GetNextRecognitionSite(
 	// lower case the search sequence
 	searchSequence = strings.ToLower(searchSequence)
 
-	match := restrictionBatch.combinedRegex.FindStringIndex(searchSequence)
-	if match == nil {
-		return nil
+	searchOffset := 0
+	for {
+		match := restrictionBatch.combinedRegex.FindStringIndex(searchSequence[searchOffset:])
+		if match == nil {
+			return nil
+		}
+
+		matchStart := searchOffset + match[0] + offset
+
+		// If the match is beyond the original sequence length, we
+		// should ignore it
+		if matchStart >= originalSequenceLength {
+			return nil
+		}
+
+		results := restrictionBatch.getResultsForMatchPosition(
+			matchStart,
+			sequence,
+			isCircular,
+		)
+		if len(results) > 0 {
+			return results
+		}
+
+		searchOffset += match[0] + 1
+		if searchOffset >= len(searchSequence) {
+			return nil
+		}
 	}
-
-	// If the match is beyond the original sequence length, we
-	// should ignore it
-	if match[0]+offset >= originalSequenceLength {
-		return nil
-	}
-
-	matchedSite := searchSequence[match[0]:match[1]]
-
-	return restrictionBatch.getResultsForMatchSite(
-		matchedSite,
-		match[0]+offset,
-		sequence)
 }
 
-func (restrictionBatch *RestrictionBatch) getResultsForMatchSite(
-	matchedSite string,
+func (restrictionBatch *RestrictionBatch) getResultsForMatchPosition(
 	matchStart int,
 	sequence string,
+	isCircular bool,
 ) []RecognitionSiteResult {
-
 	results := []RecognitionSiteResult{}
 	matchedEnzymeNames := map[string]bool{}
-
-	// Match the recognition site to the enzymes on the forward strand
-	strand := constants.Watson
-	fwdEnzymes := restrictionBatch.fwdSiteToEnzyme[matchedSite]
-	for _, fwdEnzyme := range fwdEnzymes {
-		watsonCutIndex, crickCutIndex := fwdEnzyme.GetCutSitePositions(matchStart, strand)
-		results = append(results, RecognitionSiteResult{
-			RecognitionSiteIndex: matchStart,
-			Enzyme:               fwdEnzyme,
-			Strand:               strand,
-
-			WatsonCutIndex: watsonCutIndex,
-			CrickCutIndex:  crickCutIndex,
-		})
-
-		matchedEnzymeNames[fwdEnzyme.Name] = true
-	}
-
-	strand = constants.Crick
-	revEnzymes := restrictionBatch.revSiteToEnzyme[matchedSite]
-	for _, revEnzyme := range revEnzymes {
-
-		// If the enzyme has already been matched on the forward strand,
-		// we should skip it. This can happen if the recognition site is
-		// a palindrome.
-		if _, ok := matchedEnzymeNames[revEnzyme.Name]; ok {
-			continue
+	for _, candidate := range restrictionBatch.orderedEnzymes {
+		remainingSequence := sequence[matchStart:]
+		if isCircular {
+			if len(sequence) > len(candidate.Site) {
+				remainingSequence += sequence[:len(candidate.Site)-1]
+			} else {
+				remainingSequence += sequence
+			}
 		}
 
-		watsonCutIndex, crickCutIndex := revEnzyme.GetCutSitePositions(matchStart, strand)
-		results = append(results, RecognitionSiteResult{
-			RecognitionSiteIndex: matchStart,
-			Enzyme:               revEnzyme,
-			Strand:               strand,
-
-			WatsonCutIndex: watsonCutIndex,
-			CrickCutIndex:  crickCutIndex,
-		})
-	}
-
-	// Confirm that there are not multiple enzymes that match the same site
-	// This is possible if the recognition site is 1 bp shorter than the additional
-	// enzymes recognition site
-	for i := 1; i < 5; i++ {
-		endIndex := matchStart + i
-		if endIndex >= len(sequence) {
-			break
-		}
-
-		additionalSite := sequence[matchStart:endIndex]
-		additionalEnzymes := restrictionBatch.fwdSiteToEnzyme[additionalSite]
-		for _, addEnzyme := range additionalEnzymes {
-			watsonCutIndex, crickCutIndex := addEnzyme.GetCutSitePositions(matchStart, strand)
+		if forwardMatch := candidate.RegexpFor.FindStringIndex(remainingSequence); forwardMatch != nil && forwardMatch[0] == 0 {
+			watsonCutIndex, crickCutIndex := candidate.GetCutSitePositions(matchStart, constants.Watson)
 			results = append(results, RecognitionSiteResult{
 				RecognitionSiteIndex: matchStart,
-				Enzyme:               addEnzyme,
-				Strand:               strand,
-
-				WatsonCutIndex: watsonCutIndex,
-				CrickCutIndex:  crickCutIndex,
+				Enzyme:               candidate,
+				Strand:               constants.Watson,
+				WatsonCutIndex:       watsonCutIndex,
+				CrickCutIndex:        crickCutIndex,
 			})
+			matchedEnzymeNames[candidate.Name] = true
 		}
 
+		if reverseMatch := candidate.RegexpRev.FindStringIndex(remainingSequence); reverseMatch != nil && reverseMatch[0] == 0 {
+			if matchedEnzymeNames[candidate.Name] {
+				continue
+			}
+
+			watsonCutIndex, crickCutIndex := candidate.GetCutSitePositions(matchStart, constants.Crick)
+			results = append(results, RecognitionSiteResult{
+				RecognitionSiteIndex: matchStart,
+				Enzyme:               candidate,
+				Strand:               constants.Crick,
+				WatsonCutIndex:       watsonCutIndex,
+				CrickCutIndex:        crickCutIndex,
+			})
+		}
 	}
 
 	return results
@@ -219,14 +205,30 @@ func (restrictionBatch *RestrictionBatch) getResultsForMatchSite(
 func (restrictionBatch *RestrictionBatch) buildCombinedPattern() {
 	restrictionBatch.fwdSiteToEnzyme = make(map[string][]*Enzyme)
 	restrictionBatch.revSiteToEnzyme = make(map[string][]*Enzyme)
+	restrictionBatch.orderedEnzymes = nil
 
 	if len(restrictionBatch.Enzymes) == 0 {
 		restrictionBatch.combinedRegex = nil
 		return
 	}
 
+	enzymes := append([]Enzyme(nil), restrictionBatch.Enzymes...)
+	sort.Slice(enzymes, func(i, j int) bool {
+		if enzymes[i].Length != enzymes[j].Length {
+			return enzymes[i].Length > enzymes[j].Length
+		}
+
+		if enzymes[i].Site != enzymes[j].Site {
+			return enzymes[i].Site < enzymes[j].Site
+		}
+
+		return enzymes[i].Name < enzymes[j].Name
+	})
+
 	patternString := "("
-	for _, enzyme := range restrictionBatch.Enzymes {
+	for i := range enzymes {
+		enzyme := &enzymes[i]
+		restrictionBatch.orderedEnzymes = append(restrictionBatch.orderedEnzymes, enzyme)
 
 		fwdExpStr := strings.ToLower(enzyme.RegexpFor.String())
 		revExpStr := strings.ToLower(enzyme.RegexpRev.String())
@@ -243,8 +245,8 @@ func (restrictionBatch *RestrictionBatch) buildCombinedPattern() {
 			restrictionBatch.revSiteToEnzyme[revSite] = []*Enzyme{}
 		}
 
-		restrictionBatch.fwdSiteToEnzyme[fwdSite] = append(restrictionBatch.fwdSiteToEnzyme[fwdSite], &enzyme)
-		restrictionBatch.revSiteToEnzyme[revSite] = append(restrictionBatch.revSiteToEnzyme[revSite], &enzyme)
+		restrictionBatch.fwdSiteToEnzyme[fwdSite] = append(restrictionBatch.fwdSiteToEnzyme[fwdSite], enzyme)
+		restrictionBatch.revSiteToEnzyme[revSite] = append(restrictionBatch.revSiteToEnzyme[revSite], enzyme)
 	}
 	patternString = patternString[:len(patternString)-1] + ")"
 	restrictionBatch.combinedRegex = regexp.MustCompile(patternString)

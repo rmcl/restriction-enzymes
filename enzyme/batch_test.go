@@ -1,6 +1,7 @@
 package enzyme
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/rmcl/restriction-enzymes/constants"
@@ -68,4 +69,72 @@ func TestSearchBatch(unittest *testing.T) {
 		unittest.Errorf("Expected 1 BsaI site, got %d", len(results["BsaI"]))
 	}
 
+}
+
+func TestSearchBatchPrefersLongerOverlappingRecognitionSite(unittest *testing.T) {
+	shortOverlap := Enzyme{
+		Name:              "ShortOverlap",
+		Site:              "GTCTC",
+		Length:            5,
+		Substrate:         "DNA",
+		RegexpFor:         regexp.MustCompile("(?i)GTCTC"),
+		RegexpRev:         regexp.MustCompile("(?i)GAGAC"),
+		NumberOfCuts:      2,
+		CutType:           "sticky",
+		FivePrimeCutSite:  6,
+		ThreePrimeCutSite: 10,
+	}
+
+	batch := NewRestrictionBatch(
+		FIXTURES["BsaI"],
+		shortOverlap,
+	)
+
+	sequence := "AAAGGTCTCAAAGAGACCTTT"
+
+	results, err := batch.Search(sequence, false)
+	if err != nil {
+		unittest.Fatalf("Error searching: %v", err)
+	}
+
+	if len(results["BsaI"]) != 2 {
+		unittest.Fatalf("Expected 2 BsaI sites, got %d (%v)", len(results["BsaI"]), results["BsaI"])
+	}
+
+	if len(results["ShortOverlap"]) != 2 {
+		unittest.Fatalf("Expected 2 ShortOverlap sites, got %d (%v)", len(results["ShortOverlap"]), results["ShortOverlap"])
+	}
+}
+
+func TestGetNextRecognitionSiteReturnsAllOverlappingMatchesAtPosition(unittest *testing.T) {
+	shortOverlap := Enzyme{
+		Name:              "ShortOverlap",
+		Site:              "GTCTC",
+		Length:            5,
+		Substrate:         "DNA",
+		RegexpFor:         regexp.MustCompile("(?i)GTCTC"),
+		RegexpRev:         regexp.MustCompile("(?i)GAGAC"),
+		NumberOfCuts:      2,
+		CutType:           "sticky",
+		FivePrimeCutSite:  6,
+		ThreePrimeCutSite: 10,
+	}
+
+	batch := NewRestrictionBatch(
+		FIXTURES["BsaI"],
+		shortOverlap,
+	)
+
+	results := batch.GetNextRecognitionSite("AAAGAGACCTTT", 0, false)
+	if len(results) != 2 {
+		unittest.Fatalf("Expected 2 overlapping matches, got %d", len(results))
+	}
+
+	if results[0].Enzyme.Name != "BsaI" || results[0].Strand != constants.Crick {
+		unittest.Fatalf("Expected first overlapping match to be BsaI on the crick strand, got %s %s", results[0].Enzyme.Name, results[0].Strand)
+	}
+
+	if results[1].Enzyme.Name != "ShortOverlap" || results[1].Strand != constants.Crick {
+		unittest.Fatalf("Expected second overlapping match to be ShortOverlap on the crick strand, got %s %s", results[1].Enzyme.Name, results[1].Strand)
+	}
 }
